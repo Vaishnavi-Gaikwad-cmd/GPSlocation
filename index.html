@@ -9,15 +9,18 @@
   body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; }
   header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 24px; display: flex; align-items: center; gap: 10px; }
   header h1 { font-size: 17px; font-weight: 500; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #34a853; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #34a853; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   .layout { display: flex; height: calc(100vh - 53px); }
   #map { flex: 1; }
-  .sidebar { width: 280px; background: #fff; border-left: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar { width: 300px; background: #fff; border-left: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
   .sidebar-header { padding: 14px 16px; border-bottom: 1px solid #e0e0e0; font-size: 12px; font-weight: 500; color: #777; text-transform: uppercase; letter-spacing: 0.05em; }
   .entries { flex: 1; overflow-y: auto; }
   .entry-card { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.15s; }
   .entry-card:hover { background: #f8f8f8; }
   .entry-card.active { background: #e8f5e9; border-left: 3px solid #34a853; }
+  .entry-card img { width: 100%; height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: #f0f0f0; display: block; }
+  .entry-no-img { width: 100%; height: 80px; background: #f5f5f5; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 12px; }
   .entry-label { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
   .entry-coords { font-size: 12px; color: #888; font-family: monospace; }
   .entry-note { font-size: 12px; color: #555; margin-top: 4px; }
@@ -31,9 +34,6 @@
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════
-     FILL IN YOUR KEYS HERE
-══════════════════════════════════════════ -->
 <script>
 const CONFIG = {
   firebase: {
@@ -49,7 +49,6 @@ const CONFIG = {
   dbPath: "entries"
 };
 </script>
-<!-- ══════════════════════════════════════════ -->
 
 <div id="loading">
   <div class="spinner"></div>
@@ -96,7 +95,7 @@ window.initMap = function() {
     fullscreenControl: false,
     streetViewControl: false
   });
-  infoWindow = new google.maps.InfoWindow();
+  infoWindow = new google.maps.InfoWindow({ maxWidth: 260 });
   document.getElementById('loading').style.display = 'none';
   loadEntries();
 };
@@ -109,7 +108,7 @@ function loadEntries() {
 
     if (!data) {
       document.getElementById('entry-list').innerHTML =
-        '<div class="no-entries">No entries yet.<br><br>Add data in Firebase Realtime Database under <b>entries/</b></div>';
+        '<div class="no-entries">No entries yet.<br><br>Add data in Firebase under <b>entries/</b></div>';
       document.getElementById('status').textContent = 'No entries found';
       return;
     }
@@ -121,8 +120,8 @@ function loadEntries() {
 
     renderSidebar();
     fitMap();
-    document.getElementById('status').textContent =
-      `${Object.keys(data).length} location(s) loaded`;
+    const count = Object.keys(data).length;
+    document.getElementById('status').textContent = `${count} location${count !== 1 ? 's' : ''} loaded`;
   });
 }
 
@@ -143,13 +142,20 @@ function addMarker(key, entry) {
 }
 
 function openInfo(key, entry, marker) {
+  const imgHTML = entry.imageUrl
+    ? `<img src="${entry.imageUrl}" alt="${entry.label || ''}"
+        style="width:240px;height:150px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;"
+        onerror="this.style.display='none'">`
+    : '';
+
   infoWindow.setContent(`
-    <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
-      <div style="font-size:15px;font-weight:600;margin-bottom:6px;">${entry.label || 'Untitled'}</div>
+    <div style="font-family:system-ui,sans-serif;padding:4px;">
+      ${imgHTML}
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px;">${entry.label || 'Untitled'}</div>
       <div style="font-size:12px;color:#666;font-family:monospace;margin-bottom:4px;">
         Lat: ${entry.lat}<br>Lng: ${entry.lng}
       </div>
-      ${entry.note ? `<div style="font-size:13px;color:#444;margin-top:6px;">${entry.note}</div>` : ''}
+      ${entry.note ? `<div style="font-size:13px;color:#444;margin-top:4px;">${entry.note}</div>` : ''}
     </div>
   `);
   infoWindow.open(map, marker);
@@ -164,8 +170,12 @@ function renderSidebar() {
   const keys = Object.keys(allEntries);
   document.getElementById('entry-list').innerHTML = keys.map(key => {
     const e = allEntries[key];
+    const imgHTML = e.imageUrl
+      ? `<img src="${e.imageUrl}" alt="${e.label || ''}" onerror="this.style.display='none'">`
+      : `<div class="entry-no-img">No image</div>`;
     return `
       <div class="entry-card" id="card-${key}" onclick="clickCard('${key}')">
+        ${imgHTML}
         <div class="entry-label">${e.label || 'Untitled'}</div>
         <div class="entry-coords">${e.lat}, ${e.lng}</div>
         ${e.note ? `<div class="entry-note">${e.note}</div>` : ''}
